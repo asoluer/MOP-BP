@@ -1,0 +1,48 @@
+% 定义初始土地利用面积
+X0 = [x1, x2, x3, x4, x5, x6, x7, x8, x9];
+
+% 多目标函数
+function [obj1,obj2] = objective(X)
+    obj1 = -gdp_model.predict(X);
+    obj2 = -rsei_model.predict(X);
+end
+
+% 约束条件
+c1 = @(X) sum(X) - sum(X0); % 总面积不变
+c2 = @(X) gdp_model.predict(X) - 140000; % GDP目标
+c3 = @(X) gdp_model.predict(X) >= gdp_model.predict(X0); % GDP增长  
+c4 = @(X) all(0.8*X0 <= X & X <= 1.2*X0);  % 变化合理
+c5 = @(X) all(X./sum(X) <= 0.7); % 单一土地利用占比
+c6 = @(X) sum(X(5:end))./sum(X) <= 0.15; % 八类土地总占比
+c7 = @(X) X(1) >= 2660; % 保护耕地
+c8 = @(X) all(abs(X-X0) <= 0.2*X0); % 土地利用浮动限制
+
+% 随机搜索不同目标下的最优解
+X_gdp = X0;
+X_rsei = X0;  
+X_pareto = X0;  
+
+for i = 1:10000
+    X_test = X0 + randn(1,length(X0)).*0.2*X0 - 0.1*X0;
+    if c1(X_test) && c2(X_test) && c3(X_test) && c4(X_test) && c5(X_test) && c6(X_test) && c7(X_test) && c8(X_test)
+        obj = objective(X_test);
+        
+        % 更新GDP最大解
+        if obj(1) > objective(X_gdp)(1) 
+            X_gdp = X_test;
+        end
+      
+        % 更新RSEI最大解
+        if obj(2) > objective(X_rsei)(2)
+            X_rsei = X_test; 
+        end
+    
+        % 更新帕雷托最优解
+        if obj(1)+obj(2) > objective(X_pareto)(1)+objective(X_pareto)(2)
+            X_pareto = X_test;
+        end
+    end
+end
+       
+% 输出结果
+X_gdp, X_rsei, X_pareto
